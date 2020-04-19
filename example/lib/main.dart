@@ -84,6 +84,11 @@ class _ExampleAppState extends State<ExampleApp> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         PlayerWidget(url: kUrl1, mode: PlayerMode.LOW_LATENCY),
+        Text(
+          'Sample 5 (Duck Audio) ($kUrl1)',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        PlayerWidget(url: kUrl1, duckAudio: true),
       ]),
     );
   }
@@ -249,6 +254,9 @@ class _AdvancedState extends State<Advanced> {
               _Btn(
                   txt: 'Stream',
                   onPressed: () => widget.advancedPlayer.setUrl(kUrl3)),
+              _Btn(
+                  txt: 'Duck',
+                  onPressed: () => widget.advancedPlayer.setUrl(kUrl1,duckAudio: true)),
             ], mainAxisAlignment: MainAxisAlignment.spaceEvenly),
           ]),
           Column(children: [

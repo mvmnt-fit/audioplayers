@@ -58,10 +58,12 @@ public class AudioplayersPlugin implements MethodCallHandler {
                 final double volume = call.argument("volume");
                 final Integer position = call.argument("position");
                 final boolean respectSilence = call.argument("respectSilence");
+                final boolean duckAudio = call.argument("duckAudio");
                 final boolean isLocal = call.argument("isLocal");
                 final boolean stayAwake = call.argument("stayAwake");
                 player.configAttributes(respectSilence, stayAwake, context.getApplicationContext());
                 player.setVolume(volume);
+                player.setDuckAudio(duckAudio);
                 player.setUrl(url, isLocal, context.getApplicationContext());
                 if (position != null && !mode.equals("PlayerMode.LOW_LATENCY")) {
                     player.seek(position);
@@ -98,6 +100,8 @@ public class AudioplayersPlugin implements MethodCallHandler {
             case "setUrl": {
                 final String url = call.argument("url");
                 final boolean isLocal = call.argument("isLocal");
+                final boolean duckAudio = call.argument("duckAudio");
+                player.setDuckAudio(duckAudio);
                 player.setUrl(url, isLocal, context.getApplicationContext());
                 break;
             }

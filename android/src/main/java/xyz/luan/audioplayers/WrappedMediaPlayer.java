@@ -1,15 +1,21 @@
 package xyz.luan.audioplayers;
 
 import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.PowerManager;
 import android.content.Context;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import java.io.IOException;
 
-public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnSeekCompleteListener {
+public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnSeekCompleteListener, AudioManager.OnAudioFocusChangeListener {
+
+    private static final Logger LOGGER = Logger.getLogger(AudioplayersPlugin.class.getCanonicalName());
 
     private String playerId;
 
@@ -18,6 +24,7 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
     private float rate = 1.0f;
     private boolean respectSilence;
     private boolean stayAwake;
+    private boolean duckAudio;
     private ReleaseMode releaseMode = ReleaseMode.RELEASE;
     private String playingRoute = "speakers";
 
@@ -29,6 +36,7 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
 
     private MediaPlayer player;
     private AudioplayersPlugin ref;
+    private Context playingContext;
 
     WrappedMediaPlayer(AudioplayersPlugin ref, String playerId) {
         this.ref = ref;
@@ -139,6 +147,11 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
         }
     }
 
+    @Override
+    void setDuckAudio(boolean duckAudio) {
+        this.duckAudio = duckAudio;
+    }
+
     /**
      * Getter methods
      */
@@ -163,23 +176,80 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
         return this.playing && this.prepared;
     }
 
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        if (focusChange == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK){
+            LOGGER.log(Level.INFO, "onAudioFocusChange - AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK");
+            if(this.playing) {
+                player.setVolume((float) (volume * .8), (float) (volume * .8));
+            }
+        } else if (focusChange == AudioManager.AUDIOFOCUS_GAIN) {
+            LOGGER.log(Level.INFO, "onAudioFocusChange - AUDIOFOCUS_GAIN");
+            player.setVolume((float) volume, (float) volume);
+            this.startPlaying();
+        }
+    }
+
     /**
      * Playback handling methods
      */
 
     @Override
     void play(Context context) {
+        boolean waitForAudioFocus = false;
+        if (this.duckAudio) {
+            int result;
+            AudioManager audioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                AudioAttributes mAudioAttributes =
+                        new AudioAttributes.Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build();
+                AudioFocusRequest mAudioFocusRequest =
+                        new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                                .setAudioAttributes(mAudioAttributes)
+                                .setAcceptsDelayedFocusGain(true)
+                                .setOnAudioFocusChangeListener(this)
+                                .build();
+
+                result = audioManager.requestAudioFocus(mAudioFocusRequest);
+            } else {
+                result = audioManager.requestAudioFocus(this,
+                        AudioManager.STREAM_MUSIC,
+                        AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+            }
+            if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                LOGGER.log(Level.INFO, "requestAudioFocus != AudioManager.AUDIOFOCUS_REQUEST_GRANTED");
+                waitForAudioFocus = true;
+            }
+        }
         if (!this.playing) {
             this.playing = true;
+            this.playingContext = context;
             if (this.released) {
                 this.released = false;
                 this.player = createPlayer(context);
                 this.setSource(url);
                 this.player.prepareAsync();
             } else if (this.prepared) {
-                this.player.start();
-                this.ref.handleIsPlaying(this);
+                // Playing will start in onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN)
+                if (!waitForAudioFocus) {
+                    this.startPlaying();
+                }
             }
+        }
+    }
+
+    void startPlaying() {
+        this.player.start();
+        this.ref.handleIsPlaying(this);
+    }
+
+    void abandonAudioFocus() {
+        if(this.duckAudio && (playingContext != null)) {
+            AudioManager audioManager = (AudioManager) playingContext.getSystemService(Context.AUDIO_SERVICE);
+            audioManager.abandonAudioFocus(this);
         }
     }
 
@@ -194,6 +264,7 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
                 this.playing = false;
                 this.player.pause();
                 this.player.seekTo(0);
+                this.abandonAudioFocus();  
             }
         } else {
             this.release();
@@ -208,6 +279,7 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
 
         if (this.playing) {
             this.player.stop();
+            this.abandonAudioFocus();
         }
         this.player.reset();
         this.player.release();
@@ -223,6 +295,7 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
         if (this.playing) {
             this.playing = false;
             this.player.pause();
+            this.abandonAudioFocus();
         }
     }
 
@@ -245,8 +318,7 @@ public class WrappedMediaPlayer extends Player implements MediaPlayer.OnPrepared
         this.prepared = true;
         ref.handleDuration(this);
         if (this.playing) {
-            this.player.start();
-            ref.handleIsPlaying(this);
+            this.startPlaying();
         }
         if (this.shouldSeekTo >= 0) {
             this.player.seekTo(this.shouldSeekTo);

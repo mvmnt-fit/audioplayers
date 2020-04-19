@@ -23,6 +23,8 @@ abstract class Player {
 
     abstract int setRate(double rate);
 
+    abstract void setDuckAudio(boolean duckAudio);
+
     abstract void configAttributes(boolean respectSilence, boolean stayAwake, Context context);
 
     abstract void setReleaseMode(ReleaseMode releaseMode);

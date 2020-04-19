@@ -198,6 +198,10 @@ public class WrappedSoundPool extends Player {
     }
 
     @Override
+    void setDuckAudio(boolean duckAudio) {
+    }
+
+    @Override
     void configAttributes(boolean respectSilence, boolean setWakeMode, Context context) {
     }
 

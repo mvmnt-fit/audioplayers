@@ -371,11 +371,13 @@ class AudioPlayer {
     Duration position,
     bool respectSilence = false,
     bool stayAwake = false,
+    bool duckAudio = false,
   }) async {
     isLocal ??= isLocalUrl(url);
     volume ??= 1.0;
     respectSilence ??= false;
     stayAwake ??= false;
+    duckAudio ??= false;
 
     final int result = await _invokeMethod('play', {
       'url': url,
@@ -384,6 +386,7 @@ class AudioPlayer {
       'position': position?.inMilliseconds,
       'respectSilence': respectSilence,
       'stayAwake': stayAwake,
+      'duckAudio': duckAudio,
     });
 
     if (result == 1) {
@@ -513,10 +516,15 @@ class AudioPlayer {
   ///
   /// respectSilence is not implemented on macOS.
   Future<int> setUrl(String url,
-      {bool isLocal: false, bool respectSilence = false}) {
+      {bool isLocal: false, bool respectSilence = false,bool duckAudio = false}) {
     isLocal = isLocalUrl(url);
-    return _invokeMethod('setUrl',
-        {'url': url, 'isLocal': isLocal, 'respectSilence': respectSilence});
+    duckAudio ??= false;
+    return _invokeMethod('setUrl', {
+      'url': url, 
+      'isLocal': isLocal, 
+      'respectSilence': respectSilence,
+      'duckAudio': duckAudio,
+    });
   }
 
   /// Get audio duration after setting url.
