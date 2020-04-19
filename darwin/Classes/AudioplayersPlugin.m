@@ -13,6 +13,8 @@ NSString *const AudioplayersPluginStop = @"AudioplayersPluginStop";
 
 static NSMutableDictionary * players;
 
+static bool duckingEnabled = false;
+
 @interface AudioplayersPlugin()
 -(void) pause: (NSString *) playerId;
 -(void) stop: (NSString *) playerId;
@@ -163,18 +165,15 @@ const float _defaultPlaybackRate = 1.0;
                         result(0);
                     if (call.arguments[@"respectSilence"] == nil)
                         result(0);
-                    if (call.arguments[@"duckAudio"] == nil)
-                        result(0);
                     int isLocal = [call.arguments[@"isLocal"]intValue] ;
                     float volume = (float)[call.arguments[@"volume"] doubleValue] ;
                     int milliseconds = call.arguments[@"position"] == [NSNull null] ? 0.0 : [call.arguments[@"position"] intValue] ;
                     bool respectSilence = [call.arguments[@"respectSilence"]boolValue] ;
-                    bool duckAudio = [call.arguments[@"duckAudio"]boolValue] ;
                     CMTime time = CMTimeMakeWithSeconds(milliseconds / 1000,NSEC_PER_SEC);
                     NSLog(@"isLocal: %d %@", isLocal, call.arguments[@"isLocal"] );
                     NSLog(@"volume: %f %@", volume, call.arguments[@"volume"] );
                     NSLog(@"position: %d %@", milliseconds, call.arguments[@"positions"] );
-                    [self play:playerId url:url isLocal:isLocal volume:volume time:time isNotification:respectSilence duckAudio:duckAudio];
+                    [self play:playerId url:url isLocal:isLocal volume:volume time:time isNotification:respectSilence];
                   },
                 @"pause":
                   ^{
@@ -213,12 +212,10 @@ const float _defaultPlaybackRate = 1.0;
                     NSString *url = call.arguments[@"url"];
                     int isLocal = [call.arguments[@"isLocal"]intValue];
                     bool respectSilence = [call.arguments[@"respectSilence"]boolValue] ;
-                    bool duckAudio = [call.arguments[@"duckAudio"]boolValue] ;
                     [ self setUrl:url
                           isLocal:isLocal
                           isNotification:respectSilence
                           playerId:playerId
-                          duckAudio:duckAudio
                           onReady:^(NSString * playerId) {
                             result(@(1));
                           }
@@ -276,10 +273,18 @@ const float _defaultPlaybackRate = 1.0;
                     NSString *releaseMode = call.arguments[@"releaseMode"];
                     bool looping = [releaseMode hasSuffix:@"LOOP"];
                     [self setLooping:looping playerId:playerId];
-                  }
+                  },
+                @"setDucking":
+                  ^{
+                    NSLog(@"setDucking");
+                    bool duckAudio = [call.arguments[@"enable"]boolValue] ;
+                    [self setDucking:duckAudio];
+                  },
                 };
 
-  [ self initPlayerInfo:playerId ];
+  if(![call.method isEqualToString:@"setDucking"]) {
+    [ self initPlayerInfo:playerId ];
+  }
   CaseBlock c = methods[call.method];
   if (c) c(); else {
     NSLog(@"not implemented");
@@ -287,6 +292,20 @@ const float _defaultPlaybackRate = 1.0;
   }
   if(![call.method isEqualToString:@"setUrl"]) {
     result(@(1));
+  }
+}
+
+-(void) setDucking: (bool) enabled {
+  duckingEnabled = enabled;
+  NSLog(@"duckingEnabled = %d",duckingEnabled);
+  if(!duckingEnabled) {
+#if TARGET_OS_IPHONE
+    NSError *error = nil;
+    [[AVAudioSession sharedInstance] setActive:NO error:&error];
+    if (error) {
+      NSLog(@"Error setting active: %@", error);
+    }
+#endif
   }
 }
 
@@ -441,7 +460,6 @@ const float _defaultPlaybackRate = 1.0;
        isLocal: (bool) isLocal
        isNotification: (bool) respectSilence
        playerId: (NSString*) playerId
-       duckAudio: (bool) duckAudio
        onReady:(VoidCallback)onReady
 {
   NSMutableDictionary * playerInfo = players[playerId];
@@ -462,9 +480,8 @@ const float _defaultPlaybackRate = 1.0;
       // AVAudioSessionCategoryOptionMixWithOthers option. If so, it prevents infoCenter from working correctly.
       if (respectSilence) {
         success = [[AVAudioSession sharedInstance] setCategory:category withOptions:AVAudioSessionCategoryOptionMixWithOthers error:&error];
-      } else if (duckAudio) {
+      } else if (duckingEnabled) {
         success = [[AVAudioSession sharedInstance] setCategory:category withOptions:AVAudioSessionCategoryOptionDuckOthers error:&error];
-        [ playerInfo setObject:@true forKey:@"duckAudio" ];
       } else {
         success = [[AVAudioSession sharedInstance] setCategory:category error:&error];
       }
@@ -472,7 +489,7 @@ const float _defaultPlaybackRate = 1.0;
       if (!success) {
         NSLog(@"Error setting speaker: %@", error);
       }
-      if (!duckAudio) {
+      if (!duckingEnabled) {
         [[AVAudioSession sharedInstance] setActive:YES error:&error];
       }
   #endif
@@ -540,13 +557,11 @@ const float _defaultPlaybackRate = 1.0;
       volume: (float) volume
         time: (CMTime) time
       isNotification: (bool) respectSilence
-      duckAudio: (bool) duckAudio
 {
   [ self setUrl:url
          isLocal:isLocal
          isNotification:respectSilence
          playerId:playerId
-         duckAudio:duckAudio
          onReady:^(NSString * playerId) {
            NSMutableDictionary * playerInfo = players[playerId];
            AVPlayer *player = playerInfo[@"player"];
@@ -619,7 +634,7 @@ const float _defaultPlaybackRate = 1.0;
   [ player pause ];
   [playerInfo setObject:@false forKey:@"isPlaying"];
 
-  if ([playerInfo[@"duckAudio"] boolValue]) {
+  if (duckingEnabled) {
     bool playing = false;
     for (NSString* playerId in players) {
         NSMutableDictionary * playerInfo = players[playerId];

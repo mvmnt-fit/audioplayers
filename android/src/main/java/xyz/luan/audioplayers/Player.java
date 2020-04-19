@@ -23,8 +23,6 @@ abstract class Player {
 
     abstract int setRate(double rate);
 
-    abstract void setDuckAudio(boolean duckAudio);
-
     abstract void configAttributes(boolean respectSilence, boolean stayAwake, Context context);
 
     abstract void setReleaseMode(ReleaseMode releaseMode);
@@ -34,6 +32,8 @@ abstract class Player {
     abstract int getCurrentPosition();
 
     abstract boolean isActuallyPlaying();
+
+    abstract void onAudioFocusChange(int focusChange);
 
     abstract void setPlayingRoute(String playingRoute, Context context);
 

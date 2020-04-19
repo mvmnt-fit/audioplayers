@@ -10,10 +10,9 @@ enum PlayingRouteState { speakers, earpiece }
 class PlayerWidget extends StatefulWidget {
   final String url;
   final PlayerMode mode;
-  final bool duckAudio;
 
   PlayerWidget(
-      {Key key, @required this.url, this.mode = PlayerMode.MEDIA_PLAYER,this.duckAudio = false})
+      {Key key, @required this.url, this.mode = PlayerMode.MEDIA_PLAYER})
       : super(key: key);
 
   @override
@@ -209,7 +208,7 @@ class _PlayerWidgetState extends State<PlayerWidget> {
             _position.inMilliseconds < _duration.inMilliseconds)
         ? _position
         : null;
-    final result = await _audioPlayer.play(url, position: playPosition, duckAudio: widget.duckAudio);
+    final result = await _audioPlayer.play(url, position: playPosition);
     if (result == 1) setState(() => _playerState = PlayerState.playing);
 
     // default playback rate is 1.0

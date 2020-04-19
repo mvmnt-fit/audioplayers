@@ -84,11 +84,6 @@ class _ExampleAppState extends State<ExampleApp> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         PlayerWidget(url: kUrl1, mode: PlayerMode.LOW_LATENCY),
-        Text(
-          'Sample 5 (Duck Audio) ($kUrl1)',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        PlayerWidget(url: kUrl1, duckAudio: true),
       ]),
     );
   }
@@ -199,6 +194,9 @@ class _ExampleAppState extends State<ExampleApp> {
               ],
             ),
             title: Text('audioplayers Example'),
+            actions: <Widget>[
+              DuckingSwitch(),
+            ],
           ),
           body: TabBarView(
             children: [
@@ -213,6 +211,31 @@ class _ExampleAppState extends State<ExampleApp> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class DuckingSwitch extends StatefulWidget {
+  const DuckingSwitch({
+    Key key,
+  }) : super(key: key);
+
+  @override
+  _DuckingSwitchState createState() => _DuckingSwitchState();
+}
+
+class _DuckingSwitchState extends State<DuckingSwitch> {
+  bool duckAudio = false;
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(duckAudio ? Icons.volume_down : Icons.volume_up),
+      onPressed: () {
+        setState(() {
+          duckAudio = !duckAudio;
+          AudioPlayer.setDucking(duckAudio);
+        });
+      },
     );
   }
 }
@@ -254,9 +277,6 @@ class _AdvancedState extends State<Advanced> {
               _Btn(
                   txt: 'Stream',
                   onPressed: () => widget.advancedPlayer.setUrl(kUrl3)),
-              _Btn(
-                  txt: 'Duck',
-                  onPressed: () => widget.advancedPlayer.setUrl(kUrl1,duckAudio: true)),
             ], mainAxisAlignment: MainAxisAlignment.spaceEvenly),
           ]),
           Column(children: [

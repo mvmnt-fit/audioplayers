@@ -320,6 +320,14 @@ class AudioPlayer {
         .then((result) => (result as int));
   }
 
+  /// Reduce the volume (duck) of other apps during playback
+  static Future<int> setDucking(bool enable) {
+    enable ??= false;
+    return _channel
+        .invokeMethod('setDucking', {"enable":enable})
+        .then((result) => (result as int));
+  }
+
   /// this should be called after initiating AudioPlayer only if you want to
   /// listen for notification changes in the background. Not implemented on macOS
   void startHeadlessService() {
@@ -371,13 +379,11 @@ class AudioPlayer {
     Duration position,
     bool respectSilence = false,
     bool stayAwake = false,
-    bool duckAudio = false,
   }) async {
     isLocal ??= isLocalUrl(url);
     volume ??= 1.0;
     respectSilence ??= false;
     stayAwake ??= false;
-    duckAudio ??= false;
 
     final int result = await _invokeMethod('play', {
       'url': url,
@@ -386,7 +392,6 @@ class AudioPlayer {
       'position': position?.inMilliseconds,
       'respectSilence': respectSilence,
       'stayAwake': stayAwake,
-      'duckAudio': duckAudio,
     });
 
     if (result == 1) {
@@ -516,14 +521,12 @@ class AudioPlayer {
   ///
   /// respectSilence is not implemented on macOS.
   Future<int> setUrl(String url,
-      {bool isLocal: false, bool respectSilence = false,bool duckAudio = false}) {
+      {bool isLocal: false, bool respectSilence = false}) {
     isLocal = isLocalUrl(url);
-    duckAudio ??= false;
     return _invokeMethod('setUrl', {
       'url': url, 
       'isLocal': isLocal, 
       'respectSilence': respectSilence,
-      'duckAudio': duckAudio,
     });
   }
 

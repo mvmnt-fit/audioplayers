@@ -1,8 +1,11 @@
 package xyz.luan.audioplayers;
 
+import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.os.Build;
 import android.content.Context;
 import android.os.Handler;
+import android.media.AudioFocusRequest;
 
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
@@ -15,9 +18,10 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.PluginRegistry.Registrar;
 
-public class AudioplayersPlugin implements MethodCallHandler {
+public class AudioplayersPlugin implements MethodCallHandler, AudioManager.OnAudioFocusChangeListener {
 
     private static final Logger LOGGER = Logger.getLogger(AudioplayersPlugin.class.getCanonicalName());
+    private static boolean duckingEnabled = false;
 
     private final MethodChannel channel;
     private final Map<String, Player> mediaPlayers = new HashMap<>();
@@ -41,7 +45,12 @@ public class AudioplayersPlugin implements MethodCallHandler {
     @Override
     public void onMethodCall(final MethodCall call, final MethodChannel.Result response) {
         try {
-            handleMethodCall(call, response);
+            if(call.method.equalsIgnoreCase("setDucking")){
+                final boolean enable = call.argument("enable");
+                setDucking(enable);
+            } else {
+                handleMethodCall(call, response);
+            }
         } catch (Exception e) {
             LOGGER.log(Level.SEVERE, "Unexpected error!", e);
             response.error("Unexpected error!", e.getMessage(), e);
@@ -58,12 +67,10 @@ public class AudioplayersPlugin implements MethodCallHandler {
                 final double volume = call.argument("volume");
                 final Integer position = call.argument("position");
                 final boolean respectSilence = call.argument("respectSilence");
-                final boolean duckAudio = call.argument("duckAudio");
                 final boolean isLocal = call.argument("isLocal");
                 final boolean stayAwake = call.argument("stayAwake");
                 player.configAttributes(respectSilence, stayAwake, context.getApplicationContext());
                 player.setVolume(volume);
-                player.setDuckAudio(duckAudio);
                 player.setUrl(url, isLocal, context.getApplicationContext());
                 if (position != null && !mode.equals("PlayerMode.LOW_LATENCY")) {
                     player.seek(position);
@@ -100,8 +107,6 @@ public class AudioplayersPlugin implements MethodCallHandler {
             case "setUrl": {
                 final String url = call.argument("url");
                 final boolean isLocal = call.argument("isLocal");
-                final boolean duckAudio = call.argument("duckAudio");
-                player.setDuckAudio(duckAudio);
                 player.setUrl(url, isLocal, context.getApplicationContext());
                 break;
             }
@@ -243,5 +248,67 @@ public class AudioplayersPlugin implements MethodCallHandler {
             }
         }
     }
+
+    private void setDucking(boolean enable) {
+        this.duckingEnabled = enable;
+    }
+
+    protected boolean getDucking() {
+        return this.duckingEnabled;
+    }
+
+    protected int requestAudioFocus() {
+        int result = 0;
+        AudioManager audioManager = (AudioManager) context.getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            AudioAttributes audioAttributes =
+                    new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build();
+            AudioFocusRequest audioFocusRequest =
+                    new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+                            .setAudioAttributes(audioAttributes)
+                            .setAcceptsDelayedFocusGain(true)
+                            .setOnAudioFocusChangeListener(this)
+                            .build();
+            result = audioManager.requestAudioFocus(audioFocusRequest);
+        } else {
+            result = audioManager.requestAudioFocus(this,
+                    AudioManager.STREAM_MUSIC,
+                    AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK);
+        }
+        LOGGER.log(Level.INFO, "requestAudioFocus:" + result);
+        return result;
+    }
+
+    protected void abandonAudioFocus() {
+        if(this.duckingEnabled) {
+            boolean nonePlaying = true;
+            for (Player player : mediaPlayers.values()) {
+                if (player.isActuallyPlaying()) {
+                    nonePlaying = false;
+                    break;
+                }
+            }
+            if(nonePlaying) {
+                AudioManager audioManager = (AudioManager) context.getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+                audioManager.abandonAudioFocus(this);
+                LOGGER.log(Level.INFO, "abandonAudioFocus");
+            }
+        }
+    }
+
+    // Handle AudioManager.OnAudioFocusChangeListener events from requestAudioFocus
+    // passing the events to each player to handle
+    @Override
+    public void onAudioFocusChange(int focusChange) {
+        LOGGER.log(Level.INFO, "onAudioFocusChange:" + focusChange);
+        for (Player player : mediaPlayers.values()) {
+            player.onAudioFocusChange(focusChange);
+        }
+    }
+
+
 }
 

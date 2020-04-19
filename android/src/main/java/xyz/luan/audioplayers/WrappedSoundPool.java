@@ -198,10 +198,6 @@ public class WrappedSoundPool extends Player {
     }
 
     @Override
-    void setDuckAudio(boolean duckAudio) {
-    }
-
-    @Override
     void configAttributes(boolean respectSilence, boolean setWakeMode, Context context) {
     }
 
@@ -224,8 +220,11 @@ public class WrappedSoundPool extends Player {
     }
 
     @Override
-    boolean isActuallyPlaying() {
-        return false;
+    boolean isActuallyPlaying() { return this.playing; }
+
+    @Override
+    void onAudioFocusChange(int focusChange) {
+        return;
     }
 
     @Override
