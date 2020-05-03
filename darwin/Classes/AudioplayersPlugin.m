@@ -635,32 +635,32 @@ const float _defaultPlaybackRate = 1.0;
   [playerInfo setObject:@false forKey:@"isPlaying"];
 
   if (duckingEnabled) {
-    bool playing = false;
-    for (NSString* playerId in players) {
-        NSMutableDictionary * playerInfo = players[playerId];
-        if ([playerInfo[@"isPlaying"] boolValue]) {
-          playing = true;
-          break;
+    // To prevent the plugin generating the following error:
+    //
+    // Deactivating an audio session that has running I/O. All I/O should be stopped or 
+    // paused prior to deactivating the audio session.
+    //
+    // The active state is changed after a delay, ideally this would
+    // happen after a system generated event from the pause, but there isn't one
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+      dispatch_get_main_queue(), ^{
+        bool playing = false;
+        for (NSString* playerId in players) {
+            NSMutableDictionary * playerInfo = players[playerId];
+            if ([playerInfo[@"isPlaying"] boolValue]) {
+              playing = true;
+              break;
+            }
         }
-    }
-    if(!playing) {
-      // To prevent the plugin generating the following error:
-      //
-      // Deactivating an audio session that has running I/O. All I/O should be stopped or 
-      // paused prior to deactivating the audio session.
-      //
-      // The active state is changed after a delay, ideally this would
-      // happen after a system generated event from the pause, but there isn't one
-      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
-        dispatch_get_main_queue(), ^{
+        if(!playing) {    
           NSLog(@"async -> setActive:NO");
           NSError *error = nil;
           [[AVAudioSession sharedInstance] setActive:NO error:&error];
           if (error) {
             NSLog(@"Error setting active: %@", error);
           }
-        });
-    } 
+        }
+      });
   }
 }
 
