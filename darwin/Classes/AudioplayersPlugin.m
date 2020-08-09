@@ -318,7 +318,7 @@ const float _defaultPlaybackRate = 1.0;
 -(void) setActive: (bool) active {
 #if TARGET_OS_IPHONE
     NSError *error = nil;
-    [[AVAudioSession sharedInstance] setActive:active error:&error];
+    [[AVAudioSession sharedInstance] setActive:(active ? YES : NO) error:&error];
     if (error) {
       NSLog(@"Error setting active: %@", error);
     }
