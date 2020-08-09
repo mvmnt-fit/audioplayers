@@ -328,6 +328,17 @@ class AudioPlayer {
         .then((result) => (result as int));
   }
 
+  /// Specify true to activate your app’s audio session, or false to deactivate it
+  static Future<int> setActive(bool active) {
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      active ??= false;
+      return _channel
+          .invokeMethod('setActive', {"active":active})
+          .then((result) => (result as int));
+    }
+    return Future<int>.value(0);
+  }
+
   /// this should be called after initiating AudioPlayer only if you want to
   /// listen for notification changes in the background. Not implemented on macOS
   void startHeadlessService() {

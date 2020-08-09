@@ -280,9 +280,15 @@ const float _defaultPlaybackRate = 1.0;
                     bool duckAudio = [call.arguments[@"enable"]boolValue] ;
                     [self setDucking:duckAudio];
                   },
+                @"setActive":
+                  ^{
+                    bool active = [call.arguments[@"active"]boolValue] ;
+                    NSLog(@"setActive %i",active);
+                    [self setActive:active];
+                  },
                 };
 
-  if(![call.method isEqualToString:@"setDucking"]) {
+  if(![call.method isEqualToString:@"setDucking"] && ![call.method isEqualToString:@"setActive"]) {
     [ self initPlayerInfo:playerId ];
   }
   CaseBlock c = methods[call.method];
@@ -307,6 +313,16 @@ const float _defaultPlaybackRate = 1.0;
     }
 #endif
   }
+}
+
+-(void) setActive: (bool) active {
+#if TARGET_OS_IPHONE
+    NSError *error = nil;
+    [[AVAudioSession sharedInstance] setActive:active error:&error];
+    if (error) {
+      NSLog(@"Error setting active: %@", error);
+    }
+#endif
 }
 
 -(void) initPlayerInfo: (NSString *) playerId {

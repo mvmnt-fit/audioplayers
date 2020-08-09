@@ -196,6 +196,7 @@ class _ExampleAppState extends State<ExampleApp> {
             title: Text('audioplayers Example'),
             actions: <Widget>[
               DuckingSwitch(),
+              ActiveSwitch(),
             ],
           ),
           body: TabBarView(
@@ -234,6 +235,31 @@ class _DuckingSwitchState extends State<DuckingSwitch> {
         setState(() {
           duckAudio = !duckAudio;
           AudioPlayer.setDucking(duckAudio);
+        });
+      },
+    );
+  }
+}
+
+class ActiveSwitch extends StatefulWidget {
+  const ActiveSwitch({
+    Key key,
+  }) : super(key: key);
+
+  @override
+  _ActiveSwitchState createState() => _ActiveSwitchState();
+}
+
+class _ActiveSwitchState extends State<ActiveSwitch> {
+  bool active = false;
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(active ? Icons.do_not_disturb_on : Icons.do_not_disturb_off),
+      onPressed: () {
+        setState(() {
+          active = !active;
+          AudioPlayer.setActive(active);
         });
       },
     );
